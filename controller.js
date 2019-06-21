@@ -9,7 +9,7 @@ exports.indexPage = (req,res) =>{
 exports.getNoteById = (req,res) =>{
     let id = req.params.id
 
-    connection.query(`SELECT notes.id, notes.title, notes.note, notes.category, notes.time, categories.description FROM notes INNER JOIN categories ON notes.category = categories.category WHERE notes.id=?`, [id], (error,rows,field)=>{
+    connection.query(`SELECT notes.id, notes.title, notes.note, notes.category, notes.time FROM notes INNER JOIN categories ON notes.category = categories.category WHERE notes.id=?`, [id], (error,rows,field)=>{
         if(error){
             console.log(error)
         }
@@ -39,67 +39,76 @@ exports.getAllNotes = (req,res) =>{
     }
     if(queryParams.search == undefined && queryParams.sort == undefined && queryParams.amount == undefined && queryParams.page == undefined){
         console.log(queryParams)
-        connection.query(`SELECT notes.id, notes.title, notes.note, notes.category, notes.time, categories.description FROM notes INNER JOIN categories ON notes.category = categories.category`, (error,rows,field)=>{
-            if(error){
-                console.log(error)
-                return res.status(500).send({
-                    message:'Error'
-                })
-            }
-            else{
+        let amount = 10
+        let page = 1
+        let offsetStart = page > 1 ? (page * amount) - amount : 0
+        connection.query(`SELECT COUNT(id) AS count FROM notes`, (err,rows,field)=>{
+            let total = rows[0].count
+            let pages = Math.ceil(total/amount)
+            connection.query(`SELECT * FROM notes LIMIT ${amount} OFFSET ${offsetStart} `, (err,rows,field)=>{
                 return res.status(200).send({
-                    status: 200,
-                    data: rows
+                    status:200,
+                    data:rows,
+                    totalDatas:total,
+                    currentPage:page,
+                    totalPages:pages,
+                    limit:amount
                 })
-            }
+            })
         })
     }
     else{
         // Search only
         if(queryParams.sort == undefined && queryParams.amount == undefined && queryParams.page == undefined){
             let searchKey = queryParams.search
-
-            connection.query(`SELECT * FROM notes WHERE title LIKE '%${searchKey}%' `, (error, rows, field)=>{
-                if(error){
-                    console.log(error)
-                    return res.status(500).send({
-                        message:'Error'
-                    })
-                }
-                else{
-                    if(rows.length == 0){
-                        return res.status(404).send({
-                            status:404,
-                            message: 'Data not Found'
+            let amount = 10
+            let page = 1
+            let offsetStart = page > 1 ? (page * amount) - amount : 0
+            connection.query(`SELECT COUNT(id) AS count FROM notes`, (err,rows,field)=>{
+                let total = rows[0].count
+                let pages = Math.ceil(total/amount)
+                connection.query(`SELECT * FROM notes WHERE title LIKE '%${searchKey}%' ORDER BY time DESC LIMIT ${amount} OFFSET ${offsetStart}`, (err,rows,field)=>{
+                    if(rows.length>0){
+                        return res.status(200).send({
+                            status:200,
+                            data:rows,
+                            totalDatas:total,
+                            currentPage:page,
+                            totalPages:pages,
+                            limit:amount
                         })
                     }
                     else{
-                        return res.status(200).send({
-                            status: 200,
-                            data: rows
+                        return res.status(404).send({
+                            status:404,
+                            message:`Data with searchKey: '${searchKey}' is not Found`
                         })
                     }
-                }
+                })
             })
+            
         }
         // Sort only
         else if(queryParams.search == undefined && queryParams.amount == undefined && queryParams.page == undefined){
             let sortMode = queryParams.sort.toUpperCase()
             
             if(sortMode === 'ASC' || sortMode === 'DESC'){
-                connection.query(`SELECT * FROM notes ORDER BY time ${sortMode}`, (error, rows, field)=>{
-                    if(error){
-                        console.log(error)
-                        return res.status(500).send({
-                            message:'Error'
-                        })
-                    }
-                    else{
+                let amount = 10
+                let page = 1
+                let offsetStart = page > 1 ? (page * amount) - amount : 0
+                connection.query(`SELECT COUNT(id) AS count FROM notes`, (err,rows,field)=>{
+                    let total = rows[0].count
+                    let pages = Math.ceil(total/amount)
+                    connection.query(`SELECT * FROM notes ORDER BY time ${sortMode} LIMIT ${amount} OFFSET ${offsetStart}`, (err,rows,field)=>{
                         return res.status(200).send({
                             status:200,
-                            data: rows
+                            data:rows,
+                            totalDatas:total,
+                            currentPage:page,
+                            totalPages:pages,
+                            limit:amount
                         })
-                    }
+                    })
                 })
             }
             else{
@@ -111,7 +120,7 @@ exports.getAllNotes = (req,res) =>{
         }
         // Paginate only
         else if(queryParams.search == undefined && queryParams.sort == undefined){
-            let amount = queryParams.amount
+            let amount = queryParams.amount ? queryParams.amount : 10
             let page = queryParams.page
             let offsetStart = page > 1 ? (page * amount) - amount : 0
             connection.query(`SELECT COUNT(id) AS count FROM notes`, (err,rows,field)=>{
@@ -119,31 +128,47 @@ exports.getAllNotes = (req,res) =>{
                 let pages = Math.ceil(total/amount)
                 connection.query(`SELECT * FROM notes LIMIT ${amount} OFFSET ${offsetStart} `, (err,rows,field)=>{
                     return res.status(200).send({
+                        status:200,
                         data:rows,
-                        total_pages:pages
+                        totalDatas:total,
+                        currentPage:page,
+                        totalPages:pages,
+                        limit:amount
                     })
                 })
             })
         }
         // Search & Sort
         else if(queryParams.amount == undefined && queryParams.page == undefined){
+            
             let searchKey = queryParams.search
-            let sortMode = queryParams.sort.toUpperCase()
+            let sortMode = queryParams.sort.toUpperCase() ? queryParams.sort.toUpperCase() : 'DESC'
             
             if(sortMode === 'ASC' || sortMode === 'DESC'){
-                connection.query(`SELECT * FROM notes WHERE title LIKE '%${searchKey}%' ORDER BY time ${sortMode}`, (error, rows, field)=>{
-                    if(error){
-                        console.log(error)
-                        return res.status(500).send({
-                            message:'Error'
-                        })
-                    }
-                    else{
-                        return res.status(200).send({
-                            status:200,
-                            data: rows
-                        })
-                    }
+                let amount = 10
+                let page = 1
+                let offsetStart = page > 1 ? (page * amount) - amount : 0
+                connection.query(`SELECT COUNT(id) AS count FROM notes`, (err,rows,field)=>{
+                    let total = rows[0].count
+                    let pages = Math.ceil(total/amount)
+                    connection.query(`SELECT * FROM notes WHERE title LIKE '%${searchKey}%' ORDER BY time ${sortMode} LIMIT ${amount} OFFSET ${offsetStart}`, (err,rows,field)=>{
+                        if(rows.length>0){
+                            return res.status(200).send({
+                                status:200,
+                                data:rows,
+                                totalDatas:total,
+                                currentPage:page,
+                                totalPages:pages,
+                                limit:amount
+                            })
+                        }
+                        else{
+                            return res.status(404).send({
+                                status:404,
+                                message:`Data with searchKey: '${searchKey}' is not Found`
+                            })
+                        }
+                    })
                 })
             }
             else{
@@ -156,24 +181,36 @@ exports.getAllNotes = (req,res) =>{
         // Search & Paginate
         else if(queryParams.sort == undefined){
             let searchKey = queryParams.search
-            let amount = queryParams.amount
+            let amount = queryParams.amount ? queryParams.amount : 10
             let page = queryParams.page
             let offsetStart = page > 1 ? (page * amount) - amount : 0
             connection.query(`SELECT COUNT(id) AS count FROM notes WHERE title LIKE '%${searchKey}%'`, (err,rows,field)=>{
                 let total = rows[0].count
                 let pages = Math.ceil(total/amount)
                 connection.query(`SELECT * FROM notes WHERE title LIKE '%${searchKey}%' LIMIT ${amount} OFFSET ${offsetStart}  `, (err,rows,field)=>{
-                    return res.status(200).send({
-                        data:rows,
-                        total_pages:pages
-                    })
+                    if(rows.length>0){
+                        return res.status(200).send({
+                            status:200,
+                            data:rows,
+                            totalDatas:total,
+                            currentPage:page,
+                            totalPages:pages,
+                            limit:amount
+                        })
+                    }
+                    else{
+                        return res.status(404).send({
+                            status:404,
+                            message:`Data with searchKey: '${searchKey}' is not Found`
+                        })
+                    }
                 })
             })
         }
         // Sort & Paginate
         else if(queryParams.search == undefined){
-            let sortMode = queryParams.sort.toUpperCase()
-            let amount = queryParams.amount
+            let sortMode = queryParams.sort.toUpperCase() ? queryParams.sort.toUpperCase() : 'DESC'
+            let amount = queryParams.amount ? queryParams.amount : 10
             let page = queryParams.page
             let offsetStart = page > 1 ? (page * amount) - amount : 0
 
@@ -183,8 +220,12 @@ exports.getAllNotes = (req,res) =>{
                     let pages = Math.ceil(total/amount)
                     connection.query(`SELECT * FROM notes ORDER BY time ${sortMode} LIMIT ${amount} OFFSET ${offsetStart} `, (err,rows,field)=>{
                         return res.status(200).send({
+                            status:200,
                             data:rows,
-                            total_pages:pages
+                            totalDatas:total,
+                            currentPage:page,
+                            totalPages:pages,
+                            limit:amount
                         })
                     })
                 })
@@ -199,7 +240,7 @@ exports.getAllNotes = (req,res) =>{
         else{
             let searchKey = queryParams.search
             let sortMode = queryParams.sort.toUpperCase()
-            let amount = queryParams.amount
+            let amount = queryParams.amount ? queryParams.amount : 10
             let page = queryParams.page
             let offsetStart = page > 1 ? (page * amount) - amount : 0
 
@@ -208,10 +249,22 @@ exports.getAllNotes = (req,res) =>{
                     let total = rows[0].count
                     let pages = Math.ceil(total/amount)
                     connection.query(`SELECT * FROM notes WHERE title LIKE '%${searchKey}%' ORDER BY time ${sortMode} LIMIT ${amount} OFFSET ${offsetStart} `, (err,rows,field)=>{
-                        return res.status(200).send({
-                            data:rows,
-                            total_pages:pages
-                        })
+                        if(rows.length>0){
+                            return res.status(200).send({
+                                status:200,
+                                data:rows,
+                                totalDatas:total,
+                                currentPage:parseInt(page),
+                                totalPages:pages,
+                                limit:amount
+                            })
+                        }
+                        else{
+                            return res.status(404).send({
+                                status:404,
+                                message:`Data with searchKey: '${searchKey}' is not Found`
+                            })
+                        }
                     })
                 })
             }
@@ -313,21 +366,10 @@ exports.getDataFromPaginate = (req,res) =>{
 
 //POST Controller
 exports.addNewNote = (req,res) =>{
-    //Create current date
-    let today = new Date()
-    
-    // https://stackoverflow.com/questions/1531093/how-do-i-get-the-current-date-in-javascript
-    let currentTime = {
-        dd: String(today.getDate()).padStart(2, '0'),
-        mm: String(today.getMonth()+1).padStart(2, '0'), // because January is 0
-        yyyy:today.getFullYear()
-    }
-    today = currentTime.yyyy+'-'+currentTime.mm+'-'+currentTime.dd
     let record = {
         title: req.body.title,
         note: req.body.note,
         category: req.body.category.toLowerCase(),
-        time: today
     }
     connection.query("SELECT category FROM categories WHERE category=?", [record.category], (error,rows,field)=>{
         if(error){
@@ -339,7 +381,7 @@ exports.addNewNote = (req,res) =>{
         else{
             if(rows.length == 0) {
                 connection.query(
-                    `INSERT INTO notes SET title=?, note=?, category=?, time=?`, [record.title, record.note, record.category, record.time],
+                    `INSERT INTO notes SET title=?, note=?, category=?`, [record.title, record.note, record.category],
                     (err,rows,field)=>{
                         if(err){
                             console.log(err)
