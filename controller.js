@@ -38,14 +38,13 @@ exports.getAllNotes = (req,res) =>{
         page: req.query.page
     }
     if(queryParams.search == undefined && queryParams.sort == undefined && queryParams.amount == undefined && queryParams.page == undefined){
-        console.log(queryParams)
         let amount = 10
         let page = 1
         let offsetStart = page > 1 ? (page * amount) - amount : 0
         connection.query(`SELECT COUNT(id) AS count FROM notes`, (err,rows,field)=>{
             let total = rows[0].count
             let pages = Math.ceil(total/amount)
-            connection.query(`SELECT * FROM notes LIMIT ${amount} OFFSET ${offsetStart} `, (err,rows,field)=>{
+            connection.query(`SELECT * FROM notes ORDER BY time DESC LIMIT ${amount} OFFSET ${offsetStart} `, (err,rows,field)=>{
                 return res.status(200).send({
                     status:200,
                     data:rows,
@@ -106,7 +105,8 @@ exports.getAllNotes = (req,res) =>{
                             totalDatas:total,
                             currentPage:page,
                             totalPages:pages,
-                            limit:amount
+                            limit:amount,
+                            sort:sortMode
                         })
                     })
                 })
@@ -159,7 +159,8 @@ exports.getAllNotes = (req,res) =>{
                                 totalDatas:total,
                                 currentPage:page,
                                 totalPages:pages,
-                                limit:amount
+                                limit:amount,
+                            	sort:sortMode
                             })
                         }
                         else{
@@ -201,7 +202,7 @@ exports.getAllNotes = (req,res) =>{
                     else{
                         return res.status(404).send({
                             status:404,
-                            message:`Data with searchKey: '${searchKey}' is not Found`
+                            message:`Data with searchKey: '${searchKey}' or page: '${page}' is not Found`
                         })
                     }
                 })
@@ -225,7 +226,8 @@ exports.getAllNotes = (req,res) =>{
                             totalDatas:total,
                             currentPage:page,
                             totalPages:pages,
-                            limit:amount
+                            limit:amount,
+                            sort:sortMode
                         })
                     })
                 })
@@ -256,7 +258,8 @@ exports.getAllNotes = (req,res) =>{
                                 totalDatas:total,
                                 currentPage:parseInt(page),
                                 totalPages:pages,
-                                limit:amount
+                                limit:amount,
+                            	sort:sortMode
                             })
                         }
                         else{
@@ -393,7 +396,9 @@ exports.addNewNote = (req,res) =>{
                             connection.query(`INSERT INTO categories SET category=?`,[record.category], (err,rows,field)=>{
                                 return res.status(200).send({
                                     status:200,
-                                    message: 'Data successfully added'
+                                    message: 'Data successfully added',
+                                    data: rows,
+                                    values:record
                                 })
                             })
                         }
@@ -413,7 +418,8 @@ exports.addNewNote = (req,res) =>{
                         return res.status(200).send({
                             status: 200,
                             message: 'Data added successfully',
-                            data: rows
+                            data: rows,
+                            values:record
                         })
                     }
                 })
@@ -426,13 +432,13 @@ exports.addNewNote = (req,res) =>{
 exports.addNewCategory = (req,res) =>{
     let data = {
         category: req.body.category.toLowerCase(),
-        description: req.body.description
+        image: req.body.image
     }
 
     connection.query(`SELECT category FROM categories WHERE category=?`, [data.category], (error,rows,field)=>{
         if(rows.length==0){
             // if data not found, the query can insert data into db
-            connection.query(`INSERT INTO categories SET category=?, description=?`, [data.category, data.description], (error,rows,field)=>{
+            connection.query(`INSERT INTO categories SET category=?, image=?`, [data.category, data.image], (error,rows,field)=>{
                 if(error){
                     console.log(error)
                     return res.status(400).send({
@@ -444,7 +450,8 @@ exports.addNewCategory = (req,res) =>{
                     return res.status(200).send({
                         status: 200,
                         message:'Data added successfully',
-                        data: rows
+                        data: rows,
+                        values: data
                     })
                 }
             })
@@ -522,7 +529,8 @@ exports.deleteNote = (req,res) =>{
             return res.status(200).send({
                 status:200,
                 message: 'Data was successfully deleted!',
-                data: rows
+                data: rows,
+                deletedID: id
             })
         }
     })
